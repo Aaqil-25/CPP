@@ -1,12 +1,21 @@
 #include "Contact.hpp"
 #include "PhoneBook.hpp"
+#include <cctype>
+
+static bool isBlank(const std::string &s){
+	for (size_t i = 0; i < s.length(); ++i){
+		if (!std::isspace(static_cast<unsigned char>(s[i])))
+			return false;
+	}
+	return true;
+}
 
 static bool promptField(const std::string &label, std::string &out){
 	while(true){
 		std::cout <<label <<": ";
 		if(!std::getline(std::cin, out))
 			return false;
-		if(!out.empty())
+		if(!isBlank(out))
 			return true;
 		std::cout << "Field cannot be empty. Try again." <<std::endl;
 	}

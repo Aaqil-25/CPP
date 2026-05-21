@@ -44,6 +44,17 @@ void PhoneBook::searchContact() const {
         return;
     }
 
+    if (input.empty()){
+        std::cout << "Invalid index." << std::endl;
+        return;
+    }
+    for (size_t i = 0; i < input.length(); ++i){
+        if (!std::isdigit(static_cast<unsigned char>(input[i]))){
+            std::cout << "Invalid index." << std::endl;
+            return;
+        }
+    }
+
     int idx = std::atoi(input.c_str());
     if (idx < 0 || idx >= count){
         std::cout << "Invalid index." << std::endl;

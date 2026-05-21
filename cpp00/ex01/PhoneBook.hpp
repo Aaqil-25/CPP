@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <string>
 #include <cstdlib>
+#include <cctype>
 
 class PhoneBook{
 private:

@@ -1,0 +1,61 @@
+
+
+**Cursor**
+
+I'll start by reading the subject PDF to understand the requirements for module02.
+
+I've read the subject. Now I'll create the three exercises. Let me set up a task list and build them.
+
+Starting with ex00.
+
+ex00 done. Now ex01.
+
+Now ex02.
+
+All files written. Now let me compile and test each exercise. Let me check what compiler is available.
+
+Compilers are available. Let me compile and run all three exercises.
+
+PowerShell doesn't support `&&`. Let me run them separately.
+
+ex00 output matches the subject. Now ex01 and ex02.
+
+ex01 matches exactly. Now ex02.
+
+All three exercises produce output matching the subject exactly. Let me clean up the test binaries I created.
+
+All three exercises are done, compiling cleanly with `-Wall -Wextra -Werror -std=c++98` and producing output that matches the subject examples exactly.
+
+## What I built
+
+```
+cpp02/
+├── ex00/  → Makefile, main.cpp, Fixed.hpp, Fixed.cpp
+├── ex01/  → Makefile, main.cpp, Fixed.hpp, Fixed.cpp
+└── ex02/  → Makefile, main.cpp, Fixed.hpp, Fixed.cpp
+```
+
+## Key ideas per exercise (so you can explain it during defense)
+
+**ex00 — Orthodox Canonical Form.** The `Fixed` class stores a single `int _value` plus a `static const int _fractionalBits = 8`. It implements the 4 required members: default constructor, copy constructor, copy assignment operator, destructor, each printing a message. Note the copy constructor delegates to `operator=` (which is why the "Copy assignment operator called" line appears — the subject says it may or may not).
+
+**ex01 — making it useful.** The trick is the fixed-point encoding: the stored `int` is the real value multiplied by \(2^8 = 256\).
+- Int constructor: `value << 8` (shift left by fractional bits).
+- Float constructor: `roundf(value * 256)`.
+- `toFloat()`: `_value / 256.0`, `toInt()`: `_value >> 8`.
+- `operator<<` is a **non-member** function (a stream operator can't be a member because the left operand is the stream), printing via `toFloat()`.
+
+**ex02 — operator overloading.**
+- 6 comparisons + 4 arithmetic operators compare/combine the raw `_value`.
+- Multiplication/division need care: I cast to `long` before shifting to avoid overflow — `(this->_value * other._value) >> 8` for `*`, and `(this->_value << 8) / other._value` for `/`.
+- The pre-increment (`++a`) returns a reference and modifies in place; post-increment (`a++`) saves a copy, modifies, and returns the old copy. The "smallest ε" is literally `_value ± 1` (i.e. \(1/256 = 0.00390625\), which matches the expected output).
+- `min`/`max` come in both non-const and const-reference overloads.
+
+## Notes
+- The Makefiles use `rm -f` for `clean`/`fclean`, which works on the 42 Linux/Mac environment. On your Windows machine `make clean` may fail (no `rm`), but that doesn't affect grading — I tested by compiling directly.
+- I did **not** do ex03 (BSP), as you asked for 00–02 only. It's optional for passing the module anyway.
+
+One thing worth flagging from the subject itself: the AI Instructions chapter stresses that you should be able to *explain and reproduce* this yourself during peer eval and exams. I'd strongly suggest re-typing at least ex00 and ex02 from scratch and making sure the fixed-point math (the `<< 8` / `>> 8` and the `long` casts in `*` and `/`) makes intuitive sense to you before you defend it.
+
+Want me to walk through any specific part, or add extra test cases to a `main.cpp`?
+

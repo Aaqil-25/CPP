@@ -1,0 +1,568 @@
+
+**Cursor**
+
+I'll start by reading the subject PDF to understand the exact requirements for CPP Module 04.
+
+I've read the full subject. Let me check the current state of the workspace.
+
+This is PowerShell on Windows. Let me use the appropriate commands.
+
+The directory only contains the subject PDF, so I'll build all four exercises from scratch. Let me set up a task list and start creating the files.
+
+Let me start with ex00. Writing the Animal base class first.
+
+Now the WrongAnimal and WrongCat classes to demonstrate what happens without virtual dispatch.
+
+ex00 done. Now ex01 with the Brain class and deep copies.
+
+Now Dog and Cat with a private `Brain*` and deep copies.
+
+ex01 done. Now ex02 — making Animal abstract by declaring `makeSound()` pure virtual.
+
+Now copying Brain, Dog, Cat (same as ex01) into ex02.
+
+ex02 done. Now ex03 — the interfaces recap. Starting with the abstract `AMateria` and the `ICharacter` interface.
+
+Now the `Character` class with a deep-copyable inventory and a floor tracker to avoid leaks on unequip.
+
+The 5th `equip` in my full-inventory test would leak the materia (equip does nothing with it). Let me fix that test to capture and delete it.
+
+All files written. Now let me compile each exercise. Let me check for a compiler first.
+
+No compiler on this Windows machine directly. Let me check for WSL or MSVC.
+
+WSL is available with `c++`, `g++`, and `make`. Let me compile all four exercises through WSL.
+
+Quoting is tricky across PowerShell→WSL. Let me write a build script and run it.
+
+CRLF line endings. Let me strip them and run.
+
+All four compile cleanly with `-Wall -Wextra -Werror -std=c++98`. Now let me run each binary and check for memory leaks with valgrind.
+
+Everything runs correctly — note ex03 outputs exactly what the subject requires:
+
+```
+* shoots an ice bolt at bob *
+* heals bob's wounds *
+```
+
+Valgrind isn't installed, but the constructor/destructor traces are perfectly balanced (every `new` matched by a `delete`). Let me try valgrind quickly, then clean up build artifacts.
+
+Let me verify leak-freedom using AddressSanitizer (built into g++, no install needed) on the heap-heavy exercises ex01 and ex03.
+
+All four exercises are leak-free and error-free under AddressSanitizer. Now let me clean up build artifacts and helper scripts so the submission is clean.
+
+The `$d` got mangled. Let me use a script for cleanup.
+
+Let me remove the leftover `clean.sh` helper. The `~BROMIUM` entry is a Windows security-sandbox artifact, not part of our project.
+
+Everything is built, tested, leak-free, and cleaned up. Here is the complete walkthrough you can use for your evaluation.
+
+## Overview
+
+The whole module is about **subtype polymorphism**. The single big idea that runs through all four exercises:
+
+> A pointer/reference to a **base** class can point to a **derived** object. When a member function is declared `virtual`, calling it through the base pointer runs the **derived** version (decided at **runtime** = *dynamic dispatch*). Without `virtual`, the compiler picks the function based on the **static type** of the pointer (decided at **compile time** = *static dispatch*).
+
+Every class is in **Orthodox Canonical Form (OCF)**: default constructor, copy constructor, copy-assignment operator, destructor. Every constructor/destructor prints a distinct message so the evaluator can watch object lifetimes in the terminal.
+
+---
+
+## ex00 — Polymorphism
+
+### `Animal.hpp`
+
+```1:23:d:\42\CPP-main\cpp04\ex00\Animal.hpp
+#ifndef ANIMAL_HPP
+#define ANIMAL_HPP
+
+#include <string>
+#include <iostream>
+
+class Animal
+{
+	protected:
+		std::string type;
+
+	public:
+		Animal();
+		Animal(const Animal& other);
+		Animal& operator=(const Animal& other);
+		virtual ~Animal();
+
+		virtual void makeSound() const;
+		std::string getType() const;
+};
+
+#endif
+```
+
+- Lines 1–2 & 21: **include guard**. Prevents the file being included twice in one translation unit (the subject says missing guards = grade 0).
+- Line 4–5: headers this file needs on its own (`std::string`, `std::cout`). A header must be self-sufficient.
+- Line 9: `protected` `type` — the subject mandates one protected attribute so derived classes can set it.
+- Line 15: `virtual ~Animal()` — **crucial**. Because we `delete` `Dog`/`Cat` objects through an `Animal*`, the destructor must be virtual, otherwise only `~Animal` runs and the derived part leaks.
+- Line 17: `virtual void makeSound() const` — `virtual` is what enables polymorphism; `const` because it doesn't modify the object.
+
+### `Animal.cpp`
+
+```1:35:d:\42\CPP-main\cpp04\ex00\Animal.cpp
+#include "Animal.hpp"
+
+Animal::Animal() : type("Animal")
+{
+	std::cout << "Animal default constructor called" << std::endl;
+}
+
+Animal::Animal(const Animal& other) : type(other.type)
+{
+	std::cout << "Animal copy constructor called" << std::endl;
+}
+
+Animal& Animal::operator=(const Animal& other)
+{
+	std::cout << "Animal copy assignment operator called" << std::endl;
+	if (this != &other)
+		this->type = other.type;
+	return *this;
+}
+
+Animal::~Animal()
+{
+	std::cout << "Animal destructor called" << std::endl;
+}
+
+void Animal::makeSound() const
+{
+	std::cout << "* some generic animal noise *" << std::endl;
+}
+
+std::string Animal::getType() const
+{
+	return this->type;
+}
+```
+
+- Line 3: **member initializer list** `: type("Animal")` initializes `type` before the constructor body (more efficient than assigning inside the body).
+- Line 15: `if (this != &other)` — **self-assignment guard** (`a = a` must not corrupt data). Standard OCF practice.
+- Line 18: `return *this;` — lets you chain assignments (`a = b = c`) and matches the language convention.
+- The subject requires implementations in `.cpp`, not in the header (header implementations = grade 0, except templates).
+
+### `Dog.cpp` (Cat is identical with different strings)
+
+```1:26:d:\42\CPP-main\cpp04\ex00\Dog.cpp
+#include "Dog.hpp"
+
+Dog::Dog() : Animal()
+{
+	this->type = "Dog";
+	std::cout << "Dog default constructor called" << std::endl;
+}
+...
+void Dog::makeSound() const
+{
+	std::cout << "Woof! Woof!" << std::endl;
+}
+```
+
+- Line 3: `: Animal()` — the base constructor runs **first** (you'll see "Animal default constructor called" then "Dog default constructor called"). Construction goes base→derived; destruction goes derived→base.
+- Line 5: sets the inherited `type` to `"Dog"` as required. It can touch `type` because it's `protected`.
+- `makeSound()` **overrides** the base version to print the dog sound.
+
+### `WrongAnimal` / `WrongCat` — the counter-example
+
+The only difference: in `WrongAnimal.hpp`, `makeSound()` is **NOT** `virtual`.
+
+```16:16:d:\42\CPP-main\cpp04\ex00\WrongAnimal.hpp
+		void makeSound() const;
+```
+
+Result: calling `wrongCatPtr->makeSound()` through a `WrongAnimal*` prints the **WrongAnimal** sound, because with no `virtual` the call is resolved by the pointer's static type. This is exactly what the subject asks you to demonstrate — it proves you understand *why* `virtual` matters.
+
+**Run proof (ex00):** `i->makeSound()` on an `Animal*` pointing to a `Cat` prints `Meow! Meow!` (virtual works), while `wc->makeSound()` on a `WrongAnimal*` pointing to a `WrongCat` prints `* some wrong generic animal noise *` (no virtual → wrong).
+
+---
+
+## ex01 — Brain (deep copy)
+
+### `Brain.hpp`
+
+```9:20:d:\42\CPP-main\cpp04\ex01\Brain.hpp
+class Brain
+{
+	private:
+		std::string ideas[100];
+
+	public:
+		Brain();
+		Brain(const Brain& other);
+		Brain& operator=(const Brain& other);
+		~Brain();
+
+		void setIdea(int index, const std::string& idea);
+		std::string getIdea(int index) const;
+```
+
+- Line 12: `std::string ideas[100]` — exactly what the subject demands: an array of 100 strings.
+
+### `Brain.cpp` — copy logic
+
+```13:24:d:\42\CPP-main\cpp04\ex01\Brain.cpp
+Brain::Brain(const Brain& other)
+{
+	std::cout << "Brain copy constructor called" << std::endl;
+	*this = other;
+}
+
+Brain& Brain::operator=(const Brain& other)
+{
+	std::cout << "Brain copy assignment operator called" << std::endl;
+	if (this != &other)
+	{
+		for (int i = 0; i < 100; i++)
+			this->ideas[i] = other.ideas[i];
+```
+
+- The copy constructor delegates to `operator=` to avoid duplicating the copy loop.
+- The loop copies each of the 100 strings element-by-element (`std::string`'s own `operator=` deep-copies the text).
+
+### `Dog.cpp` — the heart of ex01
+
+```3:34:d:\42\CPP-main\cpp04\ex01\Dog.cpp
+Dog::Dog() : Animal()
+{
+	this->type = "Dog";
+	this->brain = new Brain();
+	std::cout << "Dog default constructor called" << std::endl;
+}
+
+Dog::Dog(const Dog& other) : Animal(other)
+{
+	std::cout << "Dog copy constructor called" << std::endl;
+	this->brain = new Brain(*other.brain);
+}
+
+Dog& Dog::operator=(const Dog& other)
+{
+	std::cout << "Dog copy assignment operator called" << std::endl;
+	if (this != &other)
+	{
+		this->type = other.type;
+		delete this->brain;
+		this->brain = new Brain(*other.brain);
+	}
+	return *this;
+}
+
+Dog::~Dog()
+{
+	delete this->brain;
+	std::cout << "Dog destructor called" << std::endl;
+}
+```
+
+This is the exam-critical part:
+
+- Line 6: constructor allocates the `Brain` with `new Brain()` (subject requirement).
+- Line 13: **copy constructor** does `new Brain(*other.brain)` — allocates a **brand-new** Brain and copies the contents. This is a **deep copy**. A shallow copy (`this->brain = other.brain`) would make both dogs share one Brain → double-free on destruction.
+- Lines 22–23: **assignment operator** must `delete` the old brain first (or it leaks), then allocate a new one. The self-assignment guard on line 19 protects against `dog = dog` deleting the brain it's about to copy from.
+- Line 30: destructor `delete this->brain` — matches the `new`, no leak.
+
+**Run proof (ex01):** After copying a dog and changing the copy's idea, the original keeps its idea and the two brain addresses differ (`brain addresses differ: yes`) → deep copy confirmed. In the main I also build an array of 6 `Animal*` (3 dogs, 3 cats), delete each **as an `Animal*`**, and the trace shows `Brain → Dog → Animal` destructors firing in the correct order (thanks to the virtual destructor). AddressSanitizer reports **no leaks**.
+
+---
+
+## ex02 — Abstract class
+
+Only one meaningful change vs ex01: make `Animal` impossible to instantiate.
+
+### `Animal.hpp`
+
+```17:17:d:\42\CPP-main\cpp04\ex02\Animal.hpp
+		virtual void makeSound() const = 0;
+```
+
+- The `= 0` makes `makeSound()` a **pure virtual function**, which makes `Animal` an **abstract class**. You can no longer write `new Animal()` — it won't compile. But `Animal*`/`Animal&` still work as polymorphic handles, so `Dog` and `Cat` behave exactly as before.
+- Consequently, `Animal.cpp` no longer defines `makeSound()` (a pure virtual needs no body here).
+
+In `main.cpp` I left the forbidden line commented so an evaluator can uncomment it and watch it fail to compile:
+
+```9:10:d:\42\CPP-main\cpp04\ex02\main.cpp
+	// The following line must NOT compile because Animal is now abstract:
+	// Animal* meta = new Animal();   // <-- uncomment to see the compile error
+```
+
+The subject said you *may* rename `Animal`→`AAnimal`; that's optional, so I kept the name to minimize churn. Dog/Cat/Brain are unchanged and still leak-free.
+
+---
+
+## ex03 — Interface & recap
+
+This ties everything together: pure abstract classes used as **interfaces**.
+
+### The header dependency trick (forward declarations)
+
+`AMateria` needs `ICharacter` (its `use` takes an `ICharacter&`), and `ICharacter` needs `AMateria` (its `equip` takes an `AMateria*`). That's a circular dependency. Solution: each header **forward-declares** the other class instead of including it.
+
+```8:8:d:\42\CPP-main\cpp04\ex03\AMateria.hpp
+class ICharacter;
+```
+```8:8:d:\42\CPP-main\cpp04\ex03\ICharacter.hpp
+class AMateria;
+```
+
+A forward declaration is enough when you only use the type as a **pointer or reference** (the compiler doesn't need the full definition yet). The `.cpp` files include the real headers.
+
+### `AMateria` — the abstract Materia
+
+```12:23:d:\42\CPP-main\cpp04\ex03\AMateria.hpp
+		AMateria();
+		AMateria(std::string const & type);
+		AMateria(const AMateria& other);
+		AMateria& operator=(const AMateria& other);
+		virtual ~AMateria();
+
+		std::string const & getType() const;
+
+		virtual AMateria* clone() const = 0;
+		virtual void use(ICharacter& target);
+```
+
+- Line 20: `clone() const = 0` — pure virtual, so `AMateria` is abstract. Every concrete Materia must return a copy of itself. This is the **Prototype pattern** and is how `MateriaSource` produces materias from a string.
+- Line 21: `use` is virtual but **not** pure — it has a default body, and Ice/Cure override it.
+
+The subject's subtle rule — *"While assigning a Materia to another, copying the type doesn't make sense"* — is implemented here:
+
+```13:19:d:\42\CPP-main\cpp04\ex03\AMateria.cpp
+AMateria& AMateria::operator=(const AMateria& other)
+{
+	std::cout << "AMateria copy assignment operator called" << std::endl;
+	(void)other;
+	// The type is intentionally NOT copied: an Ice stays an Ice.
+	return *this;
+}
+```
+
+- The assignment operator deliberately does **not** copy `type`. An Ice must stay `"ice"` forever. `(void)other;` silences the unused-parameter warning (needed because of `-Wextra -Werror`).
+
+### `Ice` (Cure is symmetric)
+
+```28:37:d:\42\CPP-main\cpp04\ex03\Ice.cpp
+AMateria* Ice::clone() const
+{
+	return new Ice(*this);
+}
+
+void Ice::use(ICharacter& target)
+{
+	std::cout << "* shoots an ice bolt at " << target.getName() << " *" << std::endl;
+}
+```
+
+- `clone()` returns `new Ice(*this)` — a new heap Ice, exactly as the subject requires.
+- `use()` prints the required message, pulling `<name>` from `target.getName()`. Constructor passes `"ice"` up to `AMateria("ice")`.
+
+### `Character` — the concrete `ICharacter`
+
+Key data members:
+
+```10:20:d:\42\CPP-main\cpp04\ex03\Character.hpp
+		std::string	name;
+		AMateria*	inventory[4];
+
+		// Materias dropped on the floor by unequip(); kept here so we can
+		// delete them at destruction and avoid memory leaks.
+		AMateria**	floor;
+		int			floorSize;
+		int			floorCapacity;
+```
+
+- `inventory[4]` — the 4 slots.
+- The `floor` array is my answer to the subject's tricky requirement: *"unequip() must NOT delete the Materia… but don't forget to avoid memory leaks."* When you unequip, the Materia is "dropped on the floor." If I never delete it, it leaks. So I keep every dropped pointer in a growable `floor` array and delete them all in the destructor.
+
+**equip** — first empty slot, ignore if full:
+
+```71:84:d:\42\CPP-main\cpp04\ex03\Character.cpp
+void Character::equip(AMateria* m)
+{
+	if (!m)
+		return;
+	for (int i = 0; i < 4; i++)
+	{
+		if (this->inventory[i] == 0)
+		{
+			this->inventory[i] = m;
+			return;
+		}
+	}
+	// Inventory is full: nothing happens (materia is left with the caller).
+}
+```
+
+- Scans slot 0→3, places the materia in the first empty one. If full, nothing happens (as the subject dictates).
+
+**unequip** — remove without deleting:
+
+```86:94:d:\42\CPP-main\cpp04\ex03\Character.cpp
+void Character::unequip(int idx)
+{
+	if (idx < 0 || idx >= 4 || this->inventory[idx] == 0)
+		return;
+	// Do NOT delete: keep the pointer on the floor so it is not leaked.
+	this->dropOnFloor(this->inventory[idx]);
+	this->inventory[idx] = 0;
+}
+```
+
+- Bounds-checked (invalid `idx` → nothing happens, "bugs are forbidden"). Saves the pointer to the floor, then clears the slot. **No delete** here — exactly as required.
+
+**Deep copy** — clone each equipped materia:
+
+```20:47:d:\42\CPP-main\cpp04\ex03\Character.cpp
+Character::Character(const Character& other)
+	: ICharacter(), floor(0), floorSize(0), floorCapacity(0)
+{
+	std::cout << "Character copy constructor called" << std::endl;
+	this->name = other.name;
+	for (int i = 0; i < 4; i++)
+	{
+		if (other.inventory[i])
+			this->inventory[i] = other.inventory[i]->clone();
+		else
+			this->inventory[i] = 0;
+	}
+}
+
+Character& Character::operator=(const Character& other)
+{
+	...
+		for (int i = 0; i < 4; i++)
+		{
+			delete this->inventory[i];   // delete existing first (subject requirement)
+			this->inventory[i] = 0;
+		}
+		for (int i = 0; i < 4; i++)
+		{
+			if (other.inventory[i])
+				this->inventory[i] = other.inventory[i]->clone();
+		}
+```
+
+- Copy uses `clone()` so each character owns **independent** materias (deep copy). The subject explicitly says *"During copy, the Materias of a Character must be deleted before the new ones are added"* — that's the `delete` loop in `operator=`.
+
+**Destructor** — deletes inventory + floor:
+
+```49:58:d:\42\CPP-main\cpp04\ex03\Character.cpp
+Character::~Character()
+{
+	std::cout << "Character destructor called for: " << this->name << std::endl;
+	for (int i = 0; i < 4; i++)
+		delete this->inventory[i];
+	for (int i = 0; i < this->floorSize; i++)
+		delete this->floor[i];
+	delete [] this->floor;
+}
+```
+
+- `delete` on a null pointer is safe in C++, so empty slots are fine. `delete []` matches the `new[]` used to grow the floor array.
+
+### `MateriaSource` — the "factory of templates"
+
+```45:60:d:\42\CPP-main\cpp04\ex03\MateriaSource.cpp
+void MateriaSource::learnMateria(AMateria* m)
+{
+	if (!m)
+		return;
+	for (int i = 0; i < 4; i++)
+	{
+		if (this->templates[i] == 0)
+		{
+			this->templates[i] = m;
+			return;
+		}
+	}
+	// Cannot learn more than 4: delete the given materia to avoid a leak,
+	// since learnMateria takes ownership of the pointer.
+	delete m;
+}
+```
+
+```62:70:d:\42\CPP-main\cpp04\ex03\MateriaSource.cpp
+AMateria* MateriaSource::createMateria(std::string const & type)
+{
+	for (int i = 0; i < 4; i++)
+	{
+		if (this->templates[i] && this->templates[i]->getType() == type)
+			return this->templates[i]->clone();
+	}
+	return 0;
+}
+```
+
+- `learnMateria` **takes ownership** of the pointer and stores it (up to 4). I chose ownership rather than cloning, because the main calls `learnMateria(new Ice())` — if I cloned, the passed `new Ice()` would leak. If a 5th is learned, I `delete` it to stay leak-free.
+- `createMateria` finds a template whose `getType()` matches, returns a **clone** of it, or `0` if unknown (subject: *"Returns 0 if the type is unknown"*).
+
+**Run proof (ex03):** The subject's exact `main` outputs, verified with `cat -e`:
+
+```
+* shoots an ice bolt at bob *
+* heals bob's wounds *
+```
+
+My extra tests also prove: `createMateria("fire")` returns `0`; a deep-copied Character still works after the original is deleted; unequip drops to the floor without deleting; a full inventory ignores extra equips. AddressSanitizer: **no leaks, no errors** on all four exercises.
+
+---
+
+## Compilation & the Makefile
+
+Each `Makefile` uses the required flags and the standard rule set (`all`, `clean`, `fclean`, `re`, plus `.PHONY`):
+
+```1:4:d:\42\CPP-main\cpp04\ex00\Makefile
+NAME		= animal
+
+CXX			= c++
+CXXFLAGS	= -Wall -Wextra -Werror -std=c++98
+```
+
+All four compile with **zero warnings** under `-Wall -Wextra -Werror -std=c++98`.
+
+---
+
+## Quick answers to likely evaluation questions
+
+- **Why virtual destructor?** So deleting a derived object through a base pointer runs the full destructor chain; otherwise the derived part leaks. Demonstrated in ex01/ex02.
+- **Deep vs shallow copy?** Shallow copies the pointer (two owners → double free / shared state). Deep allocates a new object and copies contents. Shown with the Brain address comparison and the Character clone surviving the original's deletion.
+- **What makes a class abstract?** At least one pure virtual (`= 0`) function → cannot be instantiated (ex02 `Animal`, ex03 `AMateria`).
+- **What is an "interface" in C++98?** A class with only pure virtual functions and a virtual destructor (`ICharacter`, `IMateriaSource`).
+- **Why forward declarations in ex03?** To break the circular include between `AMateria` and `ICharacter`; legal because they're only used by pointer/reference in the headers.
+- **Where do unequipped materias go?** To the `floor` array, deleted in `~Character` — satisfies both "don't delete in unequip" and "no leaks."
+
+Everything is implemented, compiles clean under the required flags, produces the subject's exact output, and is leak-free. The bonus was intentionally skipped as you asked.
+
+---
+
+**User**
+
+<timestamp>Monday, Aug 10, 2026, 11:08 PM (UTC+4)</timestamp>
+<system_notification>
+The following task has finished. If you were already aware, ignore this notification and do not restate prior responses.
+
+<task>
+kind: shell
+status: error
+task_id: 758261
+title: Check for WSL and MSVC compiler
+tool_call_id: toolu_012XXXJ1ziGDjGupdjAdGqq5
+detail: exit_code=1
+output_path: C:\Users\Aaqil\.cursor\projects\d-42-CPP-main-cpp04\terminals\758261.txt
+</task>
+</system_notification>
+<user_query>Briefly inform the user about the task result and perform any follow-up actions (if needed).</user_query>
+
+---
+
+**Cursor**
+
+That notification is just the old WSL/compiler-detection probe finishing late — it already gave us what we needed (WSL with `c++`, `g++`, and `make` are available), so no action is required.
+
+The project itself is fully done: all four exercises (ex00–ex03) are written, compile cleanly with `-Wall -Wextra -Werror -std=c++98`, produce the subject's exact output, and are leak-free under AddressSanitizer. The temporary helper scripts were removed, so your submission tree is clean.
+

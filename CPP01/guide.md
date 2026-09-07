@@ -1,18 +1,3 @@
-# C++ cpp01 ex00 study guide
-_Exported on 6/24/2026 at 20:37:31 GMT+4 from Cursor (3.8.23)_
-
----
-
-**User**
-
-I want to study cpp01 ex00, how to do this, what are the important concept i have to do on this excercise. explain evrything line by line with more explanatioon. @ex00/en.subject.pdf 
-
----
-
-**Cursor**
-
-I'll read the exercise subject and your current ex00 files so I can explain the requirements and concepts line by line.
-
 
 # CPP01 Exercise 00: BraiiiiiiinnnzzzZ — Complete Study Guide
 

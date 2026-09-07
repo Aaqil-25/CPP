@@ -1,42 +1,5 @@
 
 
-**Cursor**
-
-I'll start by reading the subject PDF to understand the requirements for module02.
-
-I've read the subject. Now I'll create the three exercises. Let me set up a task list and build them.
-
-Starting with ex00.
-
-ex00 done. Now ex01.
-
-Now ex02.
-
-All files written. Now let me compile and test each exercise. Let me check what compiler is available.
-
-Compilers are available. Let me compile and run all three exercises.
-
-PowerShell doesn't support `&&`. Let me run them separately.
-
-ex00 output matches the subject. Now ex01 and ex02.
-
-ex01 matches exactly. Now ex02.
-
-All three exercises produce output matching the subject exactly. Let me clean up the test binaries I created.
-
-All three exercises are done, compiling cleanly with `-Wall -Wextra -Werror -std=c++98` and producing output that matches the subject examples exactly.
-
-## What I built
-
-```
-cpp02/
-├── ex00/  → Makefile, main.cpp, Fixed.hpp, Fixed.cpp
-├── ex01/  → Makefile, main.cpp, Fixed.hpp, Fixed.cpp
-└── ex02/  → Makefile, main.cpp, Fixed.hpp, Fixed.cpp
-```
-
-## Key ideas per exercise (so you can explain it during defense)
-
 **ex00 — Orthodox Canonical Form.** The `Fixed` class stores a single `int _value` plus a `static const int _fractionalBits = 8`. It implements the 4 required members: default constructor, copy constructor, copy assignment operator, destructor, each printing a message. Note the copy constructor delegates to `operator=` (which is why the "Copy assignment operator called" line appears — the subject says it may or may not).
 
 **ex01 — making it useful.** The trick is the fixed-point encoding: the stored `int` is the real value multiplied by \(2^8 = 256\).

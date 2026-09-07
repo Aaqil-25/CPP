@@ -1,5 +1,0 @@
-Hello world! This is a test.
-Replace hello with HELLO.
-hello hello hello at the start.
-Nothing to change here.
-Multiple hellohello should only match exact hello.

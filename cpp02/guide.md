@@ -1,3 +1,4 @@
+
 **ex00 — Orthodox Canonical Form.** The `Fixed` class stores a single `int _value` plus a `static const int _fractionalBits = 8`. It implements the 4 required members: default constructor, copy constructor, copy assignment operator, destructor, each printing a message. Note the copy constructor delegates to `operator=` (which is why the "Copy assignment operator called" line appears — the subject says it may or may not).
 
 **ex01 — making it useful.** The trick is the fixed-point encoding: the stored `int` is the real value multiplied by \(2^8 = 256\).
